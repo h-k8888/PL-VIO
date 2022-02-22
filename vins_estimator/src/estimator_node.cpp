@@ -50,7 +50,7 @@ Eigen::Vector3d tmp_Bg;
 Eigen::Vector3d acc_0;
 Eigen::Vector3d gyr_0;
 
-queue<pair<cv::Mat, double>> image_buf;
+queue<pair<cv::Mat, double>> image_buf;// 图像、时间戳
 LoopClosure *loop_closure;
 KeyFrameDatabase keyframe_database;
 
@@ -121,7 +121,7 @@ std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>,
 getMeasurements()
 {
     std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>,
-            std::pair<sensor_msgs::PointCloudConstPtr,sensor_msgs::PointCloudConstPtr> >> measurements;
+            std::pair<sensor_msgs::PointCloudConstPtr,sensor_msgs::PointCloudConstPtr> >> measurements;//IMU，点特征，线特征
 
     while (true)
     {
@@ -145,14 +145,14 @@ getMeasurements()
             linefeature_buf.pop();
             continue;
         }
-        sensor_msgs::PointCloudConstPtr img_msg = feature_buf.front();
+        sensor_msgs::PointCloudConstPtr img_msg = feature_buf.front();//点特征
         feature_buf.pop();
-        sensor_msgs::PointCloudConstPtr linefeature_msg = linefeature_buf.front();
+        sensor_msgs::PointCloudConstPtr linefeature_msg = linefeature_buf.front();//线特征
         linefeature_buf.pop();
 
         // 遍历两个图像之间所有的imu数据
         std::vector<sensor_msgs::ImuConstPtr> IMUs;
-        while (imu_buf.front()->header.stamp <= img_msg->header.stamp)
+        while (imu_buf.front()->header.stamp <= img_msg->header.stamp)//未估计dt
         {
             IMUs.emplace_back(imu_buf.front());
             imu_buf.pop();
@@ -238,7 +238,7 @@ void process()
     {
         //std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointCloudConstPtr>> measurements;
         std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>,
-                std::pair<sensor_msgs::PointCloudConstPtr,sensor_msgs::PointCloudConstPtr> >> measurements;
+                std::pair<sensor_msgs::PointCloudConstPtr,sensor_msgs::PointCloudConstPtr> >> measurements;//IMU，点特征，线特征
         std::unique_lock<std::mutex> lk(m_buf);
         con.wait(lk, [&]
                  {
@@ -249,19 +249,20 @@ void process()
         for (auto &measurement : measurements)
         {
             for (auto &imu_msg : measurement.first)
-                send_imu(imu_msg);                     // 处理imu数据, 预测 pose
+                send_imu(imu_msg);                     // 处理imu数据, 预测 pose， 维护状态量和雅可比
 
             auto point_and_line_msg = measurement.second;
-            auto img_msg = point_and_line_msg.first;
-            auto line_msg = point_and_line_msg.second;
+            auto img_msg = point_and_line_msg.first;//点特征
+            auto line_msg = point_and_line_msg.second;//线特征
             ROS_DEBUG("processing vision data with stamp %f \n", img_msg->header.stamp.toSec());
 
             TicToc t_s;
-            map<int, vector<pair<int, Vector3d>>> image;
+            map<int, vector<pair<int, Vector3d>>> image; // 特征点索引feature_id --> (相机id,  特征点坐标)
+            //遍历当前图像点特征
             for (unsigned int i = 0; i < img_msg->points.size(); i++)
             {
                 int v = img_msg->channels[0].values[i] + 0.5;
-                int feature_id = v / NUM_OF_CAM;
+                int feature_id = v / NUM_OF_CAM;//特征点的索引
                 int camera_id = v % NUM_OF_CAM;        // 被几号相机观测到的，如果是单目，camera_id = 0
                 double x = img_msg->points[i].x;
                 double y = img_msg->points[i].y;
@@ -269,7 +270,9 @@ void process()
                 ROS_ASSERT(z == 1);
                 image[feature_id].emplace_back(camera_id, Vector3d(x, y, z));
             }
-            map<int, vector<pair<int, Vector4d>>> lines;
+
+            map<int, vector<pair<int, Vector4d>>> lines;// 特征线索引feature_id --> (相机id,  起始点xy、终点xy)
+            //遍历当前图像线特征
             for (unsigned int i = 0; i < line_msg->points.size(); i++)
             {
                 int v = line_msg->channels[0].values[i] + 0.5;
@@ -283,6 +286,8 @@ void process()
 //                ROS_ASSERT(z == 1);
                 lines[feature_id].emplace_back(camera_id, Vector4d(x_startpoint, y_startpoint, x_endpoint, y_endpoint));
             }
+
+            ///点特征线特征处理核心函数
             estimator.processImage(image,lines, img_msg->header);   // 处理image数据，这时候的image已经是特征点数据，不是原始图像了。
   
             double whole_t = t_s.toc();
