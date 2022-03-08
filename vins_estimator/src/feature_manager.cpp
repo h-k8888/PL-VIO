@@ -212,7 +212,7 @@ bool FeatureManager::addFeatureCheckParallax(int frame_count, const map<int, vec
         }
     }
 
-    for (auto &id_line : lines)   //遍历当前帧上的特征
+    for (auto &id_line : lines)   //遍历当前帧上线特征
     {
         lineFeaturePerFrame f_per_fra(id_line.second[0].second);  // 观测
 
