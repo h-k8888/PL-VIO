@@ -133,9 +133,11 @@ bool FeatureManager::addFeatureCheckParallax(int frame_count, const map<int, vec
         }
     }
 
+    // map<int, vector<pair<int, Vector4d>>> lines
+    // 特征线索引feature_id --> (相机id,  起始点xy、终点xy)
     for (auto &id_line : lines)   //遍历当前帧上的特征
     {
-        lineFeaturePerFrame f_per_fra(id_line.second[0].second);  // 观测
+        lineFeaturePerFrame f_per_fra(id_line.second[0].second);  // 当前帧的观测值（起点终点坐标）
 
         int feature_id = id_line.first;
         //cout << "line id: "<< feature_id << "\n";
@@ -146,8 +148,8 @@ bool FeatureManager::addFeatureCheckParallax(int frame_count, const map<int, vec
 
         if (it == linefeature.end())  // 如果之前没存这个特征，说明是新的
         {
-            linefeature.push_back(lineFeaturePerId(feature_id, frame_count));
-            linefeature.back().linefeature_per_frame.push_back(f_per_fra);
+            linefeature.push_back(lineFeaturePerId(feature_id, frame_count));//记录新特征（线全局id，起始帧）
+            linefeature.back().linefeature_per_frame.push_back(f_per_fra);//对新特征记录当前帧的观测值
         }
         else if (it->feature_id == feature_id)
         {

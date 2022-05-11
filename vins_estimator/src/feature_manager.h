@@ -109,7 +109,7 @@ public:
     Eigen::Vector3d ti_;   // tij
     Eigen::Matrix3d Ri_;
     int removed_cnt;
-    int all_obs_cnt;    // 总共观测多少次了？
+    int all_obs_cnt;    // 总共观测多少次了
 
     int solve_flag; // 0 haven't solve yet; 1 solve succ; 2 solve fail;
 
